@@ -4,6 +4,7 @@ from tornado.escape import json_decode, utf8
 from tornado.gen import coroutine
 from uuid import uuid4
 
+from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 from .base import BaseHandler
 
 class LoginHandler(BaseHandler):
@@ -59,7 +60,14 @@ class LoginHandler(BaseHandler):
             self.send_error(403, message='The email address and password are invalid!')
             return
 
-        if user['password'] != password:
+        # hash the provided password with same salt as when hashing during registration
+        salt = b"\x12\xfb\x1bA\xa2\xe3\x06\xb6n\xf6\x11\x97\x00\x0c`\xf5S\xa8\xba\xf3\xf3'\xb3:h\x9f\xdaZ\xa0l\x89\xcf"
+        kdf = Scrypt(salt=salt, length=32, n=2 ** 14, r=8, p=1)
+        passphrase = password
+        passphrase_bytes = bytes(passphrase, "utf-8")
+        hashed_passphrase = kdf.derive(passphrase_bytes)
+
+        if user['password'] != hashed_passphrase:
             self.send_error(403, message='The email address and password are invalid!')
             return
 

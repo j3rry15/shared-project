@@ -1,4 +1,6 @@
 from json import dumps
+
+from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 from tornado.escape import json_decode, utf8
 from tornado.gen import coroutine
 from tornado.ioloop import IOLoop
@@ -19,9 +21,15 @@ class LoginHandlerTest(BaseTest):
 
     @coroutine
     def register(self):
+        # updating the registration code to include the hashing as without this the login tests fail as the password is being written directly to the db in this test and not being hashed
+        salt = b"\x12\xfb\x1bA\xa2\xe3\x06\xb6n\xf6\x11\x97\x00\x0c`\xf5S\xa8\xba\xf3\xf3'\xb3:h\x9f\xdaZ\xa0l\x89\xcf"
+        kdf = Scrypt(salt=salt, length=32, n=2 ** 14, r=8, p=1)
+        passphrase = self.password
+        passphrase_bytes = bytes(passphrase, "utf-8")
+        hashed_passphrase = kdf.derive(passphrase_bytes)
         yield self.get_app().db.users.insert_one({
             'email': self.email,
-            'password': self.password,
+            'password': hashed_passphrase,
             'displayName': 'testDisplayName'
         })
 
